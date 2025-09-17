@@ -41,32 +41,32 @@ async def quick_analysis(request: AnalysisRequest):
         url = str(request.url)
         logger.info(f"API: Iniciando análise rápida para {url} | Empresa: {request.company_name or 'N/D'}")
 
-        # 1) Raspagem — use a tool diretamente (determinístico)
-        from app.agents.scraper import web_scraping_tool  # importa a tool
-        scrape = web_scraping_tool.invoke(url)
-        if not scrape.get("ok"):
+        # 1) Análise completa usando ReAct Agent do Scraper
+        logger.info(f"API: Chamando Scraper Agent (ReAct)...")
+        scrape_result = agents["scraper"].scrape_and_analyze(url)
+        if not scrape_result.get("ok"):
             return {
                 "success": False,
                 "url": url,
-                "error": scrape.get("error") or "Falha na raspagem",
+                "error": scrape_result.get("error") or "Falha na análise do Scraper Agent",
                 "timestamp": datetime.now().isoformat(),
             }
 
-        raw_text = (scrape.get("text") or "")[:5000]
+        # Extrai dados do resultado do agente
+        scraper_analysis = scrape_result.get("analysis", {})
+        raw_text = scrape_result.get("text", "")
+        
         if not raw_text:
             return {
                 "success": False,
                 "url": url,
-                "error": "Conteúdo vazio após raspagem",
+                "error": "Conteúdo vazio após análise do Scraper Agent",
                 "timestamp": datetime.now().isoformat(),
             }
+        
+        logger.info(f"API: Scraper Agent (ReAct) concluído")
 
-        # 2) Estruturado (Scraper opcional) — se quiser extrair empresa/ofertas etc.
-        logger.info(f"API: Chamando Scraper Agent...")
-        scraper_analysis = agents["scraper"].extract_structured_info(raw_text)
-        logger.info(f"API: Scraper Agent concluído")
-
-        # 3) Resumo/insights — Summarizer trabalha em cima do TEXTO
+        # Resumo/insights — Summarizer trabalha em cima do TEXTO
         #    (injete o company_name no prompt implicitamente: prepend no texto)
         prefix = f"Empresa alvo: {request.company_name}\n" if request.company_name else ""
         logger.info(f"API: Chamando Summarizer Agent...")
@@ -89,11 +89,11 @@ async def quick_analysis(request: AnalysisRequest):
         return {
             "success": True,
             "url": url,
-            "scrape": {"title": scrape.get("title"), "chars": len(raw_text)},
-            "data": scraper_analysis.model_dump(),        # CompanyAnalysis -> dict
-            "analysis": analysis.model_dump(),            # CompetitiveAnalysis -> dict
-            "summary": summary,                           # human-readable
-            "validation": validation.model_dump(),        # EvaluationResult -> dict
+            "scrape": {"title": scrape_result.get("title"), "chars": len(raw_text)},
+            "data": scraper_analysis.model_dump() if hasattr(scraper_analysis, 'model_dump') else scraper_analysis,     
+            "analysis": analysis.model_dump(),          
+            "summary": summary,                          
+            "validation": validation.model_dump(),        
             "timestamp": datetime.now().isoformat(),
         }
         

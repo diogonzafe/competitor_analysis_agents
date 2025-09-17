@@ -50,15 +50,3 @@ class EvaluatorAgent:
         except Exception as e:
             print(f"Erro na avaliação estruturada: {e}")
             return EvaluationResult(completo=False, relevante=False, acionavel=False)
-
-    def check_completeness(self, data: Union[dict, EvaluationResult]) -> bool:
-        """
-        Verifica se uma análise é considerada completa.
-        """
-        if isinstance(data, EvaluationResult):
-            return data.completo and (bool(data.pontos_fortes) or bool(data.melhorias))
-        if isinstance(data, dict):
-            return bool(data.get("completo")) and (
-                bool(data.get("pontos_fortes")) or bool(data.get("melhorias"))
-            )
-        return False

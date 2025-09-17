@@ -57,20 +57,16 @@ def web_scraping_tool(url: str) -> Dict[str, Any]:
 class ScraperAgent:
     """
     Agente responsável por coleta e análise de dados de websites.
-
     
-    Funcionalidades principais:
-    - Web scraping de URLs específicas
-    - Extração de dados estruturados (nome, ofertas, preços, etc.)
-    - Análise de conteúdo com LLM
-    - Tratamento de erros e fallbacks
+    Utiliza LangChain/LangGraph ReAct Agent para análise inteligente de conteúdo,
+    combinando web scraping com extração estruturada de dados.
     """
     
     def __init__(self):
         """Inicializa o agente com LLM e configuração de ReAct."""
-        self.llm = deepseek_client.get_llm(temperature=0.2)  # Temperatura moderada para criatividade controlada
+        self.llm = deepseek_client.get_llm(temperature=0.2)
         
-        # Configura agente ReAct para uso da tool de scraping
+        # Configura agente ReAct para análise inteligente
         self.agent = create_react_agent(
             model=self.llm,
             tools=[web_scraping_tool],
@@ -78,96 +74,82 @@ class ScraperAgent:
                 "Você é especialista em coleta competitiva. "
                 "Sempre que receber uma URL, chame web_scraping_tool(url). "
                 "Se ok=false, explique o erro e pare. "
-                "Se ok=true, resuma pontos comerciais (nome, ofertas, preços, segmentos, diferenciais, contato, links)."
+                "Se ok=true, analise o conteúdo e extraia informações estruturadas sobre a empresa."
             ),
         )
 
-    def analyze_url(self, url: str) -> CompanyAnalysis:
+
+    def scrape_and_analyze(self, url: str) -> Dict[str, Any]:
         """
-        Analisa uma URL e extrai informações estruturadas sobre a empresa.
+        Método unificado que combina scraping e análise.
         
-        Processo:
-        1. Executa web scraping da URL
-        2. Se bem-sucedido, analisa o conteúdo com LLM
-        3. Extrai dados estruturados usando parsing JSON manual
-        
-        Args:
-            url: URL do website a ser analisado
-            
-        Returns:
-            CompanyAnalysis: Dados estruturados da empresa
-        """
-        # Executa scraping da URL
-        res = web_scraping_tool.invoke(url)
-        if not res.get("ok"):
-            return CompanyAnalysis()
-        
-        # Prepara dados para análise
-        text = (res.get("text") or "")[:5000]
-        title = res.get("title") or ""
-        source = res.get("url") or url
-        
-        # Prompt estruturado para extração de dados
-        prompt = (
-            "Extraia SOMENTE JSON válido conforme CompanyAnalysis do conteúdo abaixo.\n"
-            "Preencha apenas o que estiver evidente no texto.\n\n"
-            f"TÍTULO: {title}\nFONTE: {source}\n\nCONTEÚDO:\n{text}"
-        )
-        
-        try:
-            from app.utils import json_call
-            return json_call(self.llm, prompt, CompanyAnalysis)
-        except Exception as e:
-            print(f"Erro na análise estruturada do scraper: {e}")
-            return CompanyAnalysis()
-    
-    def fetch(self, url: str) -> Dict[str, Any]:
-        """
-        Helper para obter dados brutos de scraping sem análise.
+        Usa o ReAct Agent para fazer scraping e análise em uma única operação.
         
         Args:
             url: URL a ser processada
             
         Returns:
-            Dict com resultado do scraping (ok, url, title, text, error)
+            Dict com resultado completo: {ok, url, title, text, analysis, error}
         """
-        return web_scraping_tool.invoke(url)
-    
-    def get_company_info(self, url: str) -> str:
+        try:
+            # Usa o ReAct Agent para análise completa
+            result = self.agent.invoke({
+                "messages": [HumanMessage(content=f"Analise esta URL: {url}")]
+            })
+            
+            # Extrai dados do resultado do agente
+            if hasattr(result, 'messages') and result.messages:
+                agent_content = result.messages[-1].content
+            elif hasattr(result, 'content'):
+                agent_content = result.content
+            else:
+                agent_content = str(result)
+            
+            # Extrai dados estruturados diretamente
+            analysis = self._extract_analysis_from_content(agent_content)
+            
+            # Retorna resultado para compatibilidade com API
+            return {
+                "ok": True,
+                "url": url,
+                "title": analysis.name or "Título não encontrado",
+                "text": f"Empresa: {analysis.name}\nOfertas: {', '.join(analysis.offerings)}\nDiferenciais: {', '.join(analysis.differentiators)}",
+                "analysis": analysis,
+                "error": None
+            }
+            
+        except Exception as e:
+            print(f"Erro no scraping e análise: {e}")
+            return {
+                "ok": False,
+                "url": url,
+                "title": None,
+                "text": None,
+                "analysis": CompanyAnalysis(),
+                "error": str(e)
+            }
+
+    def _extract_analysis_from_content(self, content: str) -> CompanyAnalysis:
         """
-        Método de compatibilidade com API existente.
-        
-        Retorna informações da empresa em formato de string legível.
+        Extrai dados estruturados do conteúdo do agente.
         
         Args:
-            url: URL a ser analisada
+            content: Conteúdo da resposta do agente
             
         Returns:
-            str: Informações formatadas da empresa
+            CompanyAnalysis: Dados estruturados extraídos
         """
-        analysis = self.analyze_url(url)
-        return f"Empresa: {analysis.name}\nOfertas: {', '.join(analysis.offerings[:3])}\nDiferenciais: {', '.join(analysis.differentiators[:3])}"
-    
-    def extract_structured_info(self, content: str) -> CompanyAnalysis:
-        """
-        Extrai informações estruturadas de conteúdo de texto.
-        
-        Útil quando já se tem o conteúdo da página e não precisa fazer scraping.
-        
-        Args:
-            content: Conteúdo de texto a ser analisado
-            
-        Returns:
-            CompanyAnalysis: Dados estruturados extraídos do conteúdo
-        """
-        text = (content or "").strip()[:5000]
-        if not text:
-            return CompanyAnalysis()
-        
         try:
             from app.utils import json_call
-            prompt = "Extraia SOMENTE JSON válido conforme CompanyAnalysis do conteúdo abaixo.\n\n" + text
+            prompt = (
+                "Com base na análise do agente abaixo, extraia SOMENTE JSON válido conforme CompanyAnalysis:\n"
+                '{"name": "nome da empresa", "offerings": ["oferta1", "oferta2"], '
+                '"pricing": "info preços", "segments": ["segmento1", "segmento2"], '
+                '"differentiators": ["diferencial1", "diferencial2"], '
+                '"contact": "info contato", "links": ["link1", "link2"]}\n\n'
+                f"ANÁLISE DO AGENTE:\n{content}"
+            )
             return json_call(self.llm, prompt, CompanyAnalysis)
         except Exception as e:
-            print(f"Erro na análise estruturada do scraper (conteúdo bruto): {e}")
+            print(f"Erro na extração da análise: {e}")
             return CompanyAnalysis()
