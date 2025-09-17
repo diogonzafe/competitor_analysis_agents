@@ -1,6 +1,6 @@
 # Sistema de Análise de Concorrentes
 
-![Diagrama de Arquitetura](images/DesignPattern.png)
+![Diagrama de Arquitetura](./images/DesignPattern.png)
 
 Sistema inteligente para análise competitiva utilizando agentes de IA especializados. O projeto combina web scraping, processamento de linguagem natural e análise estratégica para fornecer insights detalhados sobre concorrentes.
 
