@@ -1,1 +1,2 @@
-[Diagrama.svg]
+[competitor_analysis_agents
+/Diagrama.svg]
