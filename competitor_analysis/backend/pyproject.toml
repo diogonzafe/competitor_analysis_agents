@@ -21,7 +21,6 @@ dependencies = [
     "markdown",
     "python-multipart",
     "phonenumbers",
-    "urlfinderlib",
     "price-parser"
 ]
 

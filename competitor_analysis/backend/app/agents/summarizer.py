@@ -8,7 +8,6 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import HumanMessage
 import phonenumbers
-from urlfinderlib import find_urls
 from price_parser import Price
 from urllib.parse import urlparse
 import json
