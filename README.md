@@ -1,1 +1,2 @@
-[!Diagramaarch](DesignPattern.png)
+![Diagramaarch](DesignPattern.png)
+
