@@ -43,14 +43,20 @@ function App() {
         })
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Erro na análise rápida');
+        throw new Error(data.error || data.detail || 'Erro na análise rápida');
       }
 
-      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Falha na análise');
+      }
+
       setAnalysisData(data);
     } catch (err) {
       setError(err.message);
+      console.error('Erro na análise:', err);
     } finally {
       setLoading(false);
     }

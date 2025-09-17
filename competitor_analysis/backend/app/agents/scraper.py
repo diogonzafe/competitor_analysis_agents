@@ -1,168 +1,173 @@
 """
-Agente para coleta de dados de concorrentes
+Scraper Agent - Coleta e análise de dados de websites
+
 """
-from typing import Dict, Any, Optional
+from typing import List, Optional, Dict, Any, Union
+from pydantic import BaseModel, Field
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import HumanMessage
 import re
-import asyncio
-import logging
-from datetime import datetime
+import json
 from app.utils import scraping_client, deepseek_client
 
-# Configuração de logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-@tool
-def web_scraping_tool(url: str) -> str:
-    """Coleta dados de uma URL usando ScrapingAnta"""
+class CompanyAnalysis(BaseModel):
+    """
+    Modelo de dados para análise de empresa.
+    
+    """
+    name: str = Field(default="", description="Nome da empresa ou marca")
+    offerings: List[str] = Field(default_factory=list, description="Produtos/serviços oferecidos")
+    pricing: Optional[str] = Field(None, description="Informações sobre preços")
+    segments: List[str] = Field(default_factory=list, description="Segmentos de mercado atendidos")
+    differentiators: List[str] = Field(default_factory=list, description="Diferenciais competitivos")
+    contact: Optional[str] = Field(None, description="Informações de contato")
+    links: List[str] = Field(default_factory=list, description="Links relevantes encontrados")
+
+
+@tool("web_scraping_tool")
+def web_scraping_tool(url: str) -> Dict[str, Any]:
+    """
+    Tool para coleta de dados de websites usando ScrapingAnt.
+  
+    """
+    # Validação básica da URL
+    if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+        return {"ok": False, "url": url, "title": None, "text": None, "error": "URL inválida"}
+    
     try:
-        documents = scraping_client.scrape_url(url)
-        if not documents:
-            return f"Erro: Dados não encontrados em {url}"
+        # Executa scraping com timeout de 25 segundos
+        docs = scraping_client.scrape_url(url, timeout=25)
+        if not docs:
+            return {"ok": False, "url": url, "title": None, "text": None, "error": "Sem conteúdo"}
         
-        content = _process_content_optimized(documents[0].page_content)
-        return f"Dados coletados de {url}:\n{content}"
+        # Extrai e limpa o conteúdo da página
+        content = (docs[0].page_content or "")[:12000]  # Limita a 12k caracteres
+        clean = re.sub(r"\s+", " ", content).strip()[:5000]  # Remove espaços extras e limita a 5k
         
+        # Extrai título dos metadados
+        title = getattr(docs[0], "metadata", {}).get("title") if hasattr(docs[0], "metadata") else None
+        
+        return {"ok": True, "url": url, "title": title, "text": clean, "error": None}
     except Exception as e:
-        return f"Erro no scraping: {str(e)}"
+        return {"ok": False, "url": url, "title": None, "text": None, "error": str(e)}
 
-def _process_content_optimized(content: str) -> str:
-    """Processamento conteúdo"""
-    # Remove HTML
-    clean_text = re.sub(r'<[^>]+>', '', content)
-    # Normaliza espaços
-    clean_text = re.sub(r'\s+', ' ', clean_text).strip()
-    # Limita tamanho
-    return clean_text[:3000] + "..." if len(clean_text) > 3000 else clean_text
 
 class ScraperAgent:
-    """Agente para coleta de dados"""
+    """
+    Agente responsável por coleta e análise de dados de websites.
+
+    
+    Funcionalidades principais:
+    - Web scraping de URLs específicas
+    - Extração de dados estruturados (nome, ofertas, preços, etc.)
+    - Análise de conteúdo com LLM
+    - Tratamento de erros e fallbacks
+    """
     
     def __init__(self):
-        self.llm = deepseek_client.get_llm(temperature=0.2)
+        """Inicializa o agente com LLM e configuração de ReAct."""
+        self.llm = deepseek_client.get_llm(temperature=0.2)  # Temperatura moderada para criatividade controlada
+        
+        # Configura agente ReAct para uso da tool de scraping
         self.agent = create_react_agent(
             model=self.llm,
             tools=[web_scraping_tool],
-            prompt="""Você é um especialista em coleta de dados de concorrentes.
-            
-            Tarefas:
-            1. Coletar dados de URLs fornecidas
-            2. Extrair informações comerciais relevantes
-            3. Identificar produtos, serviços, preços
-            4. Retornar dados estruturados
-            
-            Seja conciso e focado em informações úteis para análise competitiva."""
+            prompt=(
+                "Você é especialista em coleta competitiva. "
+                "Sempre que receber uma URL, chame web_scraping_tool(url). "
+                "Se ok=false, explique o erro e pare. "
+                "Se ok=true, resuma pontos comerciais (nome, ofertas, preços, segmentos, diferenciais, contato, links)."
+            ),
         )
+
+    def analyze_url(self, url: str) -> CompanyAnalysis:
+        """
+        Analisa uma URL e extrai informações estruturadas sobre a empresa.
+        
+        Processo:
+        1. Executa web scraping da URL
+        2. Se bem-sucedido, analisa o conteúdo com LLM
+        3. Extrai dados estruturados usando parsing JSON manual
+        
+        Args:
+            url: URL do website a ser analisado
+            
+        Returns:
+            CompanyAnalysis: Dados estruturados da empresa
+        """
+        # Executa scraping da URL
+        res = web_scraping_tool.invoke(url)
+        if not res.get("ok"):
+            return CompanyAnalysis()
+        
+        # Prepara dados para análise
+        text = (res.get("text") or "")[:5000]
+        title = res.get("title") or ""
+        source = res.get("url") or url
+        
+        # Prompt estruturado para extração de dados
+        prompt = (
+            "Extraia SOMENTE JSON válido conforme CompanyAnalysis do conteúdo abaixo.\n"
+            "Preencha apenas o que estiver evidente no texto.\n\n"
+            f"TÍTULO: {title}\nFONTE: {source}\n\nCONTEÚDO:\n{text}"
+        )
+        
+        try:
+            from app.utils import json_call
+            return json_call(self.llm, prompt, CompanyAnalysis)
+        except Exception as e:
+            print(f"Erro na análise estruturada do scraper: {e}")
+            return CompanyAnalysis()
     
+    def fetch(self, url: str) -> Dict[str, Any]:
+        """
+        Helper para obter dados brutos de scraping sem análise.
+        
+        Args:
+            url: URL a ser processada
+            
+        Returns:
+            Dict com resultado do scraping (ok, url, title, text, error)
+        """
+        return web_scraping_tool.invoke(url)
     
     def get_company_info(self, url: str) -> str:
-        """Coleta básica síncrona"""
+        """
+        Método de compatibilidade com API existente.
+        
+        Retorna informações da empresa em formato de string legível.
+        
+        Args:
+            url: URL a ser analisada
+            
+        Returns:
+            str: Informações formatadas da empresa
+        """
+        analysis = self.analyze_url(url)
+        return f"Empresa: {analysis.name}\nOfertas: {', '.join(analysis.offerings[:3])}\nDiferenciais: {', '.join(analysis.differentiators[:3])}"
+    
+    def extract_structured_info(self, content: str) -> CompanyAnalysis:
+        """
+        Extrai informações estruturadas de conteúdo de texto.
+        
+        Útil quando já se tem o conteúdo da página e não precisa fazer scraping.
+        
+        Args:
+            content: Conteúdo de texto a ser analisado
+            
+        Returns:
+            CompanyAnalysis: Dados estruturados extraídos do conteúdo
+        """
+        text = (content or "").strip()[:5000]
+        if not text:
+            return CompanyAnalysis()
+        
         try:
-            logger.info(f"SCRAPER: Iniciando coleta de dados de {url}")
-            documents = scraping_client.scrape_url(url)
-            if not documents:
-                logger.warning(f"SCRAPER: Nenhum documento encontrado para {url}")
-                return "Dados não encontrados"
-            
-            logger.info(f"SCRAPER: Dados coletados com sucesso de {url}")
-            logger.debug(f"SCRAPER: Tamanho do conteúdo: {len(documents[0].page_content)} caracteres")
-            
-            result = self._extract_key_info_optimized(documents[0].page_content)
-            logger.info(f"SCRAPER: Extração de informações concluída para {url}")
-            logger.debug(f"SCRAPER: Resultado extraído: {result[:200]}...")
-            
-            return result
-            
+            from app.utils import json_call
+            prompt = "Extraia SOMENTE JSON válido conforme CompanyAnalysis do conteúdo abaixo.\n\n" + text
+            return json_call(self.llm, prompt, CompanyAnalysis)
         except Exception as e:
-            logger.error(f"SCRAPER: Erro ao coletar dados de {url}: {str(e)}")
-            return f"Erro: {str(e)}"
-    
-    
-    def _extract_key_info_optimized(self, content: str) -> str:
-        """Extração otimizada para análise competitiva"""
-        # Padrões melhorados para extração
-        patterns = {
-            "title": r'<title[^>]*>(.*?)</title>',
-            "description": r'<meta[^>]*name=["\']description["\'][^>]*content=["\']([^"\']*)["\']',
-            "h1": r'<h1[^>]*>(.*?)</h1>',
-            "h2": r'<h2[^>]*>(.*?)</h2>',
-            "keywords": r'<meta[^>]*name=["\']keywords["\'][^>]*content=["\']([^"\']*)["\']',
-            "og_title": r'<meta[^>]*property=["\']og:title["\'][^>]*content=["\']([^"\']*)["\']',
-            "og_description": r'<meta[^>]*property=["\']og:description["\'][^>]*content=["\']([^"\']*)["\']'
-        }
-        
-        info = {}
-        for key, pattern in patterns.items():
-            match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
-            if match:
-                clean_text = re.sub(r'<[^>]+>', '', match.group(1)).strip()
-                if clean_text:
-                    info[key] = clean_text
-        
-        # Extrair texto principal (pular navegação, rodapé, etc.)
-        main_content = self._extract_main_content(content)
-        
-        # Estruturar informações para análise competitiva
-        result = []
-        result.append(f"Título: {info.get('title', info.get('og_title', 'N/A'))}")
-        result.append(f"Descrição: {info.get('description', info.get('og_description', 'N/A'))}")
-        
-        if info.get('h1'):
-            result.append(f"Headline Principal: {info.get('h1')}")
-        
-        if info.get('keywords'):
-            result.append(f"Palavras-chave: {info.get('keywords')}")
-        
-        result.append(f"\nConteúdo Principal:")
-        result.append(main_content)
-        
-        return "\n".join(result)
-    
-    def _extract_main_content(self, content: str) -> str:
-        """Extrai conteúdo principal da página"""
-        # Remove scripts, styles, nav, footer
-        content = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL | re.IGNORECASE)
-        content = re.sub(r'<style[^>]*>.*?</style>', '', content, flags=re.DOTALL | re.IGNORECASE)
-        content = re.sub(r'<nav[^>]*>.*?</nav>', '', content, flags=re.DOTALL | re.IGNORECASE)
-        content = re.sub(r'<footer[^>]*>.*?</footer>', '', content, flags=re.DOTALL | re.IGNORECASE)
-        content = re.sub(r'<header[^>]*>.*?</header>', '', content, flags=re.DOTALL | re.IGNORECASE)
-        
-        # Remove HTML tags
-        clean_content = re.sub(r'<[^>]+>', ' ', content)
-        
-        # Normaliza espaços
-        clean_content = re.sub(r'\s+', ' ', clean_content).strip()
-        
-        # Remove texto muito comum (navegação, etc.)
-        common_texts = [
-            'pular para o conteúdo', 'pular para navegação', 'pular para rodapé',
-            'menu', 'navegação', 'início', 'sobre', 'contato', 'login',
-            'cadastro', 'buscar', 'pesquisar', 'cookie', 'privacidade'
-        ]
-        
-        for text in common_texts:
-            clean_content = re.sub(text, '', clean_content, flags=re.IGNORECASE)
-        
-        # Foca em parágrafos e headings
-        sentences = clean_content.split('.')
-        relevant_sentences = []
-        
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if len(sentence) > 20:  # Ignora frases muito curtas
-                # Prioriza frases com palavras-chave de negócio
-                business_keywords = [
-                    'empresa', 'produto', 'serviço', 'solução', 'tecnologia',
-                    'inovação', 'crescimento', 'resultado', 'eficiencia', 'produtividade',
-                    'cliente', 'mercado', 'competitivo', 'estratégia', 'negócio'
-                ]
-                
-                if any(keyword in sentence.lower() for keyword in business_keywords):
-                    relevant_sentences.append(sentence)
-                elif len(relevant_sentences) < 10:  # Limita a 10 frases relevantes
-                    relevant_sentences.append(sentence)
-        
-        return '. '.join(relevant_sentences[:10]) + '...'
+            print(f"Erro na análise estruturada do scraper (conteúdo bruto): {e}")
+            return CompanyAnalysis()

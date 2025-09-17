@@ -1,58 +1,64 @@
 """
-Evaluator
+Evaluator Agent - Validação de qualidade das análises competitivas
+
 """
-from typing import Dict, Any
-import logging
-from datetime import datetime
+from typing import List, Union
+from pydantic import BaseModel, Field
 from app.utils import deepseek_client
 
-# Configuração de logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
+class EvaluationResult(BaseModel):
+    """
+    Modelo de dados para resultados de avaliação de qualidade.
+    """
+    completo: bool = Field(description="A análise cobre os pontos-chave?")
+    relevante: bool = Field(description="A análise é relevante para a tarefa?")
+    acionavel: bool = Field(description="Traz recomendações práticas?")
+    pontos_fortes: List[str] = Field(default_factory=list, description="Pontos fortes identificados na análise")
+    melhorias: List[str] = Field(default_factory=list, description="Sugestões de melhoria para a análise")
 
 
 class EvaluatorAgent:
-    """Evaluator com design pattern de melhoria"""
+    """
+    Agente responsável por validar a qualidade das análises competitivas.(Chamada API somente, em prod usar outro provedor se LLM para o design pattern evaluator)
+    To-do: corrigir resposta após avaliação negativa
+    """
     
     def __init__(self):
+        """Inicializa"""
         self.llm = deepseek_client.get_llm(temperature=0.1)
-    
-    
-    
-    def quick_validation(self, content: str) -> str:
-        """Validação rápida"""
+
+    def quick_validation(self, content: str) -> EvaluationResult:
+        """
+        Valida a qualidade da análise.
+        """
+        # limita o tamanho do texto de entrada
+        text = (content or "").strip()[:1200]
+        if not text:
+            return EvaluationResult(completo=False, relevante=False, acionavel=False)
+        
         try:
-            logger.info(f"EVALUATOR: Iniciando validação do sistema")
-            logger.debug(f"EVALUATOR: Tamanho do conteúdo para validação: {len(content)} caracteres")
-            
-            llm = deepseek_client.get_llm(temperature=0.1)
-            
-            prompt = f"""Validação da análise competitiva:
-
-{content[:600]}
-
-Avalie a qualidade da análise:
-1. Completo? (Sim/Não)
-2. Relevante? (Sim/Não) 
-3. Acionável? (Sim/Não)
-4. Pontos fortes identificados?
-5. Sugestões de melhoria?
-
-Seja objetivo e construtivo."""
-            
-            logger.info(f"EVALUATOR: Enviando prompt de validação para DeepSeek API")
-            response = llm.invoke(prompt)
-            logger.info(f"EVALUATOR: Validação concluída")
-            logger.debug(f"EVALUATOR: Resultado da validação: {response.content[:200]}...")
-            
-            return response.content
-            
+            from app.utils import json_call
+            # métricas de qualidade
+            prompt = (
+                "Avalie a análise competitiva abaixo e retorne APENAS um JSON válido com as seguintes chaves:\n"
+                '{"completo": true/false, "relevante": true/false, "acionavel": true/false, '
+                '"pontos_fortes": ["ponto1", "ponto2"], "melhorias": ["melhoria1", "melhoria2"]}\n\n'
+                f"{text}"
+            )
+            return json_call(self.llm, prompt, EvaluationResult)
         except Exception as e:
-            logger.error(f"EVALUATOR: Erro na validação: {str(e)}")
-            return f"Erro: {str(e)}"
-    
-    def check_completeness(self, data: Dict[str, Any]) -> bool:
-        """Verifica completude"""
-        return (data.get("success", False) and 
-                "data" in data and 
-                "timestamp" in data)
+            print(f"Erro na avaliação estruturada: {e}")
+            return EvaluationResult(completo=False, relevante=False, acionavel=False)
+
+    def check_completeness(self, data: Union[dict, EvaluationResult]) -> bool:
+        """
+        Verifica se uma análise é considerada completa.
+        """
+        if isinstance(data, EvaluationResult):
+            return data.completo and (bool(data.pontos_fortes) or bool(data.melhorias))
+        if isinstance(data, dict):
+            return bool(data.get("completo")) and (
+                bool(data.get("pontos_fortes")) or bool(data.get("melhorias"))
+            )
+        return False

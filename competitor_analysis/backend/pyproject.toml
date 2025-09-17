@@ -19,7 +19,10 @@ dependencies = [
     "httpx",
     "beautifulsoup4",
     "markdown",
-    "python-multipart"
+    "python-multipart",
+    "phonenumbers",
+    "urlfinderlib",
+    "price-parser"
 ]
 
 [build-system]
