@@ -16,7 +16,7 @@ from app.utils import Config
 async def lifespan(app: FastAPI):
     """Lifecycle da aplicação"""
     print("Iniciando Competitor Analysis API...")
-    print("Agentes: Scraper, Summarizer, Benchmark, Evaluator")
+    print("Agentes: Scraper, Summarizer, Evaluator")
     print("DeepSeek API: Configurada")
     print("ScrapingAnt: Configurado")
     yield
