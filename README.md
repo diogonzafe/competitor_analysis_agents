@@ -213,13 +213,124 @@ PORT=8000
 DEBUG=True
 ```
 
-## 📊 Fluxo de Análise
+## 📊 Fluxo de Análise Completo
 
-1. **Input**: Usuário fornece URL e nome da empresa (opcional)
-2. **Scraping**: Scraper Agent coleta dados do website
-3. **Análise**: Summarizer Agent gera análise competitiva
-4. **Validação**: Evaluator Agent valida qualidade da análise
-5. **Output**: Resultado estruturado com insights e recomendações
+### Diagrama de Fluxo dos Agentes
+
+```mermaid
+graph TD
+    A[🌐 Usuário fornece URL] --> B[📡 API Controller]
+    B --> C[🔍 Scraper Agent]
+    
+    C --> D[🌐 Web Scraping Tool]
+    D --> E[📄 Conteúdo da Página]
+    E --> F[🤖 ReAct Agent Analysis]
+    F --> G[📊 CompanyAnalysis]
+    
+    G --> H[📝 Summarizer Agent]
+    H --> I[📞 Extract Contact Info]
+    H --> J[💰 Extract Pricing Info]
+    I --> K[🧠 ReAct Agent Analysis]
+    J --> K
+    K --> L[📈 CompetitiveAnalysis]
+    
+    L --> M[✅ Evaluator Agent]
+    M --> N[📋 EvaluationResult]
+    
+    N --> O[📤 Resposta Estruturada]
+    O --> P[🎯 Frontend Dashboard]
+    
+    style A fill:#e1f5fe
+    style C fill:#f3e5f5
+    style H fill:#e8f5e8
+    style M fill:#fff3e0
+    style P fill:#fce4ec
+```
+
+### Fluxo Detalhado por Etapa
+
+1. **🌐 Input**: Usuário fornece URL e nome da empresa (opcional)
+2. **🔍 Scraper Agent**: 
+   - Valida URL
+   - Executa web scraping com ScrapingAnt
+   - Usa ReAct Agent para análise inteligente
+   - Extrai dados estruturados (CompanyAnalysis)
+3. **📝 Summarizer Agent**:
+   - Recebe dados do Scraper
+   - Extrai contatos e preços com tools especializadas
+   - Gera análise SWOT e insights estratégicos
+   - Cria recomendações acionáveis
+4. **✅ Evaluator Agent**:
+   - Valida qualidade da análise
+   - Verifica completude, relevância e acionabilidade
+   - Identifica pontos fortes e melhorias
+5. **📤 Output**: Resultado estruturado com insights e recomendações
+
+### 🔄 Fluxo Interno Detalhado dos Agentes
+
+#### 🔍 Scraper Agent - Processo Interno
+```mermaid
+graph LR
+    A[URL Input] --> B[Validação URL]
+    B --> C[ScrapingAnt API]
+    C --> D[Conteúdo Bruto]
+    D --> E[Limpeza de Dados]
+    E --> F[ReAct Agent]
+    F --> G[Análise Inteligente]
+    G --> H[CompanyAnalysis]
+```
+
+**Ferramentas**:
+- `web_scraping_tool`: Coleta dados com ScrapingAnt
+- **ReAct Agent**: Análise contextual do conteúdo
+- **Limitação**: 12k → 5k caracteres para otimização
+
+#### 📝 Summarizer Agent - Processo Interno
+```mermaid
+graph LR
+    A[Dados do Scraper] --> B[Extract Contact Info]
+    A --> C[Extract Pricing Info]
+    B --> D[ReAct Agent]
+    C --> D
+    D --> E[Análise SWOT]
+    E --> F[CompetitiveAnalysis]
+```
+
+**Ferramentas Especializadas**:
+- `extract_contact_info`: Telefones e URLs (phonenumbers)
+- `extract_pricing_info`: Preços estruturados (price_parser)
+- **Processamento de Tokens**: 500 palavras para eficiência
+- **Limitação**: 25 preços máximos
+
+#### ✅ Evaluator Agent - Processo Interno
+```mermaid
+graph LR
+    A[Análise Completa] --> B[Validação de Qualidade]
+    B --> C[Métricas: Completo/Relevante/Acionável]
+    C --> D[Pontos Fortes]
+    C --> E[Melhorias]
+    D --> F[EvaluationResult]
+    E --> F
+```
+
+**Métricas de Qualidade**:
+- **Completo**: Cobre pontos-chave?
+- **Relevante**: É relevante para a tarefa?
+- **Acionável**: Traz recomendações práticas?
+
+### 🎯 Design Pattern: Evaluator
+
+O sistema implementa o **Design Pattern Evaluator** onde:
+
+1. **Scraper** = **Coletor de Dados**
+2. **Summarizer** = **Gerador de Conteúdo** 
+3. **Evaluator** = **Validador de Qualidade**
+
+**Vantagens**:
+- ✅ **Separação de Responsabilidades**: Cada agente tem função específica
+- ✅ **Qualidade Garantida**: Validação automática das análises
+- ✅ **Escalabilidade**: Fácil adicionar novos agentes
+- ✅ **Manutenibilidade**: Código modular e testável
 
 ## 🎯 Casos de Uso
 
