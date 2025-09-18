@@ -1,42 +1,91 @@
 # Sistema de Análise de Concorrentes
 
-
-# Diagrama de arquitetura
-![Diagrama de Arquitetura Geral](Arch.png)
-
-
-# Evaluator Porpose
-![Diagrama de Arquitetura](DesignPattern.png)
-
 Sistema inteligente para análise competitiva utilizando agentes de IA especializados. O projeto combina web scraping, processamento de linguagem natural e análise estratégica para fornecer insights detalhados sobre concorrentes.
 
 ## 🏗️ Arquitetura
 
-O sistema segue uma arquitetura de **agentes especializados** com design pattern **Evaluator**, onde cada agente tem uma responsabilidade específica e trabalha em conjunto para produzir análises competitivas completas.
+### Diagrama de Arquitetura Geral
+![Diagrama de Arquitetura Geral](Arch.png)
 
 ### Design Pattern: Evaluator
+![Diagrama de Arquitetura](DesignPattern.png)
+
+O sistema segue uma arquitetura de **agentes especializados** com design pattern **Evaluator**, onde cada agente tem uma responsabilidade específica e trabalha em conjunto para produzir análises competitivas completas.
+
+**Componentes Principais**:
 - **Scraper Agent**: Coleta e estrutura dados de websites
 - **Summarizer Agent**: Analisa e gera insights competitivos
 - **Evaluator Agent**: Valida a qualidade das análises geradas
 
-## 🚀 Funcionalidades
+## 📊 Fluxo de Análise Completo
 
-### Backend (FastAPI)
-- **Web Scraping Inteligente**: Coleta dados de websites usando ScrapingAnt
-- **Análise Competitiva**: Gera análises SWOT e insights estratégicos
-- **Validação de Qualidade**: Sistema de avaliação automática das análises
-- **API RESTful**: Endpoints para integração com frontend
+### Diagrama de Fluxo dos Agentes
 
-### Frontend (React)
-- **Interface Intuitiva**: Dashboard para análise de concorrentes
-- **Visualização de Dados**: Apresentação estruturada dos resultados
-- **Status em Tempo Real**: Monitoramento do status dos agentes
-- **Design Responsivo**: Interface moderna e responsiva
+```mermaid
+graph TD
+    A[🌐 Usuário fornece URL] --> B[📡 API Controller]
+    B --> C[🔍 Scraper Agent]
+    
+    C --> D[🌐 Web Scraping Tool]
+    D --> E[📄 Conteúdo da Página]
+    E --> F[🤖 ReAct Agent Analysis]
+    F --> G[📊 CompanyAnalysis]
+    
+    G --> H[📝 Summarizer Agent]
+    H --> I[📞 Extract Contact Info]
+    H --> J[💰 Extract Pricing Info]
+    I --> K[🧠 ReAct Agent Analysis]
+    J --> K
+    K --> L[📈 CompetitiveAnalysis]
+    
+    L --> M[✅ Evaluator Agent]
+    M --> N[📋 EvaluationResult]
+    
+    N --> O[📤 Resposta Estruturada]
+    O --> P[🎯 Frontend Dashboard]
+    
+    style A fill:#e1f5fe
+    style C fill:#f3e5f5
+    style H fill:#e8f5e8
+    style M fill:#fff3e0
+    style P fill:#fce4ec
+```
+
+### Fluxo Detalhado por Etapa
+
+1. **🌐 Input**: Usuário fornece URL e nome da empresa (opcional)
+2. **🔍 Scraper Agent**: 
+   - Valida URL
+   - Executa web scraping com ScrapingAnt
+   - Usa ReAct Agent para análise inteligente
+   - Extrai dados estruturados (CompanyAnalysis)
+3. **📝 Summarizer Agent**:
+   - Recebe dados do Scraper
+   - Extrai contatos e preços com tools especializadas
+   - Gera análise SWOT e insights estratégicos
+   - Cria recomendações acionáveis
+4. **✅ Evaluator Agent**:
+   - Valida qualidade da análise
+   - Verifica completude, relevância e acionabilidade
+   - Identifica pontos fortes e melhorias
+5. **📤 Output**: Resultado estruturado com insights e recomendações
 
 ## 🤖 Agentes do Sistema
 
-### 1. Scraper Agent
+### 🔍 Scraper Agent
 **Responsabilidade**: Coleta e estruturação de dados de websites
+
+**Processo Interno**:
+```mermaid
+graph LR
+    A[URL Input] --> B[Validação URL]
+    B --> C[ScrapingAnt API]
+    C --> D[Conteúdo Bruto]
+    D --> E[Limpeza de Dados]
+    E --> F[ReAct Agent]
+    F --> G[Análise Inteligente]
+    G --> H[CompanyAnalysis]
+```
 
 **Funcionalidades**:
 - Web scraping usando ScrapingAnt (com proxy e renderização JS)
@@ -53,8 +102,24 @@ O sistema segue uma arquitetura de **agentes especializados** com design pattern
 - Informações de contato
 - Links relevantes
 
-### 2. Summarizer Agent
+**Ferramentas**:
+- `web_scraping_tool`: Coleta dados com ScrapingAnt
+- **ReAct Agent**: Análise contextual do conteúdo
+- **Limitação**: 12k → 5k caracteres para otimização
+
+### 📝 Summarizer Agent
 **Responsabilidade**: Análise competitiva e geração de insights
+
+**Processo Interno**:
+```mermaid
+graph LR
+    A[Dados do Scraper] --> B[Extract Contact Info]
+    A --> C[Extract Pricing Info]
+    B --> D[ReAct Agent]
+    C --> D
+    D --> E[Análise SWOT]
+    E --> F[CompetitiveAnalysis]
+```
 
 **Funcionalidades**:
 - Análise SWOT (Fortalezas, Ameaças, Oportunidades)
@@ -62,13 +127,25 @@ O sistema segue uma arquitetura de **agentes especializados** com design pattern
 - Geração de recomendações estratégicas
 - Análise de proposta de valor
 
-**Tools Especializadas**:
-- `extract_contact_info`: Extrai telefones e URLs
-- `extract_pricing_info`: Identifica informações de preços
-- ReAct Agent para análise contextual
+**Ferramentas Especializadas**:
+- `extract_contact_info`: Extrai telefones e URLs (phonenumbers)
+- `extract_pricing_info`: Identifica informações de preços (price_parser)
+- **Processamento de Tokens**: 500 palavras para eficiência
+- **Limitação**: 25 preços máximos
 
-### 3. Evaluator Agent
+### ✅ Evaluator Agent
 **Responsabilidade**: Validação da qualidade das análises
+
+**Processo Interno**:
+```mermaid
+graph LR
+    A[Análise Completa] --> B[Validação de Qualidade]
+    B --> C[Métricas: Completo/Relevante/Acionável]
+    C --> D[Pontos Fortes]
+    C --> E[Melhorias]
+    D --> F[EvaluationResult]
+    E --> F
+```
 
 **Funcionalidades**:
 - Avaliação de completude da análise
@@ -77,9 +154,23 @@ O sistema segue uma arquitetura de **agentes especializados** com design pattern
 - Identificação de pontos fortes e melhorias
 
 **Métricas de Qualidade**:
-- `completo`: A análise cobre os pontos-chave?
-- `relevante`: A análise é relevante para a tarefa?
-- `acionavel`: Traz recomendações práticas?
+- **Completo**: A análise cobre os pontos-chave?
+- **Relevante**: A análise é relevante para a tarefa?
+- **Acionável**: Traz recomendações práticas?
+
+## 🚀 Funcionalidades
+
+### Backend (FastAPI)
+- **Web Scraping Inteligente**: Coleta dados de websites usando ScrapingAnt
+- **Análise Competitiva**: Gera análises SWOT e insights estratégicos
+- **Validação de Qualidade**: Sistema de avaliação automática das análises
+- **API RESTful**: Endpoints para integração com frontend
+
+### Frontend (React)
+- **Interface Intuitiva**: Dashboard para análise de concorrentes
+- **Visualização de Dados**: Apresentação estruturada dos resultados
+- **Status em Tempo Real**: Monitoramento do status dos agentes
+- **Design Responsivo**: Interface moderna e responsiva
 
 ## 📡 Endpoints da API
 
@@ -213,132 +304,12 @@ PORT=8000
 DEBUG=True
 ```
 
-## 📊 Fluxo de Análise Completo
-
-### Diagrama de Fluxo dos Agentes
-
-```mermaid
-graph TD
-    A[🌐 Usuário fornece URL] --> B[📡 API Controller]
-    B --> C[🔍 Scraper Agent]
-    
-    C --> D[🌐 Web Scraping Tool]
-    D --> E[📄 Conteúdo da Página]
-    E --> F[🤖 ReAct Agent Analysis]
-    F --> G[📊 CompanyAnalysis]
-    
-    G --> H[📝 Summarizer Agent]
-    H --> I[📞 Extract Contact Info]
-    H --> J[💰 Extract Pricing Info]
-    I --> K[🧠 ReAct Agent Analysis]
-    J --> K
-    K --> L[📈 CompetitiveAnalysis]
-    
-    L --> M[✅ Evaluator Agent]
-    M --> N[📋 EvaluationResult]
-    
-    N --> O[📤 Resposta Estruturada]
-    O --> P[🎯 Frontend Dashboard]
-    
-    style A fill:#e1f5fe
-    style C fill:#f3e5f5
-    style H fill:#e8f5e8
-    style M fill:#fff3e0
-    style P fill:#fce4ec
-```
-
-### Fluxo Detalhado por Etapa
-
-1. **🌐 Input**: Usuário fornece URL e nome da empresa (opcional)
-2. **🔍 Scraper Agent**: 
-   - Valida URL
-   - Executa web scraping com ScrapingAnt
-   - Usa ReAct Agent para análise inteligente
-   - Extrai dados estruturados (CompanyAnalysis)
-3. **📝 Summarizer Agent**:
-   - Recebe dados do Scraper
-   - Extrai contatos e preços com tools especializadas
-   - Gera análise SWOT e insights estratégicos
-   - Cria recomendações acionáveis
-4. **✅ Evaluator Agent**:
-   - Valida qualidade da análise
-   - Verifica completude, relevância e acionabilidade
-   - Identifica pontos fortes e melhorias
-5. **📤 Output**: Resultado estruturado com insights e recomendações
-
-### 🔄 Fluxo Interno Detalhado dos Agentes
-
-#### 🔍 Scraper Agent - Processo Interno
-```mermaid
-graph LR
-    A[URL Input] --> B[Validação URL]
-    B --> C[ScrapingAnt API]
-    C --> D[Conteúdo Bruto]
-    D --> E[Limpeza de Dados]
-    E --> F[ReAct Agent]
-    F --> G[Análise Inteligente]
-    G --> H[CompanyAnalysis]
-```
-
-**Ferramentas**:
-- `web_scraping_tool`: Coleta dados com ScrapingAnt
-- **ReAct Agent**: Análise contextual do conteúdo
-- **Limitação**: 12k → 5k caracteres para otimização
-
-#### 📝 Summarizer Agent - Processo Interno
-```mermaid
-graph LR
-    A[Dados do Scraper] --> B[Extract Contact Info]
-    A --> C[Extract Pricing Info]
-    B --> D[ReAct Agent]
-    C --> D
-    D --> E[Análise SWOT]
-    E --> F[CompetitiveAnalysis]
-```
-
-**Ferramentas Especializadas**:
-- `extract_contact_info`: Telefones e URLs (phonenumbers)
-- `extract_pricing_info`: Preços estruturados (price_parser)
-- **Processamento de Tokens**: 500 palavras para eficiência
-- **Limitação**: 25 preços máximos
-
-#### ✅ Evaluator Agent - Processo Interno
-```mermaid
-graph LR
-    A[Análise Completa] --> B[Validação de Qualidade]
-    B --> C[Métricas: Completo/Relevante/Acionável]
-    C --> D[Pontos Fortes]
-    C --> E[Melhorias]
-    D --> F[EvaluationResult]
-    E --> F
-```
-
-**Métricas de Qualidade**:
-- **Completo**: Cobre pontos-chave?
-- **Relevante**: É relevante para a tarefa?
-- **Acionável**: Traz recomendações práticas?
-
-### 🎯 Design Pattern: Evaluator
-
-O sistema implementa o **Design Pattern Evaluator** onde:
-
-1. **Scraper** = **Coletor de Dados**
-2. **Summarizer** = **Gerador de Conteúdo** 
-3. **Evaluator** = **Validador de Qualidade**
-
-**Vantagens**:
-- ✅ **Separação de Responsabilidades**: Cada agente tem função específica
-- ✅ **Qualidade Garantida**: Validação automática das análises
-- ✅ **Escalabilidade**: Fácil adicionar novos agentes
-- ✅ **Manutenibilidade**: Código modular e testável
-
 ## 🎯 Casos de Uso
 
 - **Análise de Concorrentes**: Entender posicionamento e estratégias
 - **Inteligência de Mercado**: Identificar oportunidades e ameaças
 - **Benchmarking**: Comparar ofertas e diferenciais
 - **Pesquisa de Mercado**: Coletar dados estruturados de websites
-
 
 ## 📈 Próximos Passos
 
@@ -348,5 +319,3 @@ O sistema implementa o **Design Pattern Evaluator** onde:
 - [ ] **Múltiplos provedores LLM**: Adicionar OpenAI/Anthropic no Evaluator para maior robustez
 - [ ] **Análise comparativa**: Comparar concorrente com empresa do cliente
 - [ ] **Benchmarking automático**: Identificar gaps e oportunidades competitivas
-
-
