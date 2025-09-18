@@ -2,7 +2,7 @@
 
 
 # Diagrama de arquitetura
-![Diagrama de Arquitetura Geral](arch.png)
+![Diagrama de Arquitetura Geral](Arch.png)
 
 
 # Evaluator Porpose
